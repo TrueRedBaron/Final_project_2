@@ -1,0 +1,78 @@
+---
+title: "Final Project 2"
+output: html_document
+date: "2025-06-04"
+---
+```r
+```{r message=FALSE, warning=FALSE}
+# I was curious as to how Australia and Canada performed compared to each other, for various reasons. Politically, the two countries are constructed in that they were British colonies who obtained their political independence in the same period of time from the same government, and they have a great deal of provincal/state autonomy compared to that of other countries. As a result I thought a case study of these two countries would be interesting. As the two countries feature several similarties, but also geographical differences. I start with importing my library packages. 
+
+library(tidyverse)
+library(ggplot2)
+
+usconfirm <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv")
+globalconfirm <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv")
+deathus <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv")
+deathglobal <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv")
+
+date <- names(globalconfirm)[ncol(globalconfirm)]
+
+# Lets first take a look at the Australian data.
+
+aus_confirm <- globalconfirm %>%
+  filter(`Country/Region` == "Australia") %>%
+  select(State = `Province/State`, all_of(date)) %>%
+  rename(confirmed = all_of(date))
+
+aus_death <- deathglobal %>%
+  filter(`Country/Region` == "Australia") %>%
+  select(State = `Province/State`, all_of(date)) %>%
+  rename(deaths = all_of(date))
+  
+aus_data <- left_join(aus_confirm, aus_death, by = "State") %>%
+  mutate(DeathRate = if_else(confirmed > 0, deaths / confirmed, NA_real_))
+  
+glimpse(aus_data)
+ggplot(aus_data, aes(x = reorder(State, DeathRate), y = DeathRate)) + geom_col(fill = "steelblue") + coord_flip() + 
+labs(title = "Death Rate by State",
+  x = "State",
+  y = "Death Rate") + theme_minimal()
+  
+  # As we can see, provinces don't have a great deal of difference from one another, and are in a rather tight band of low death rates. It is best to not overestimate the numerically slight differences, and best to discuss Australia's response in contrast to Canada later. 
+  
+  
+can_confirm <- globalconfirm %>%
+  filter(`Country/Region` == "Canada") %>%
+  select(State = `Province/State`, all_of(date)) %>%
+  rename(confirmed = all_of(date))
+
+can_death <- deathglobal %>%
+  filter(`Country/Region` == "Canada") %>%
+  select(State = `Province/State`, all_of(date)) %>%
+  rename(deaths = all_of(date))
+  
+can_data <- left_join(can_confirm, can_death, by = "State") %>%
+  mutate(DeathRate = if_else(confirmed > 0, deaths / confirmed, NA_real_))
+  
+glimpse(can_data)
+
+aus_data <- aus_data %>% mutate(Country = "Australia")
+can_data <- can_data %>% mutate(Country = "Canada")
+# Since the data is now largely collected, we're going to combine it all into one dataset, and remove any NA values present.
+
+ac_data <- bind_rows(aus_data, can_data) %>%
+  filter(!is.na(DeathRate)) 
+  
+# Now, we our complete dataset of Canada and Australia's numbers, lets take a look at their differences on a state level. I am also going to color the Canadian provinces red, and the Australian States blue.
+
+ggplot(ac_data, aes(x = reorder(State, DeathRate), y = DeathRate, fill = Country)) + geom_col() + coord_flip() + 
+labs(title = "Death Rate by Province/State",
+  x = "State",
+  y = "Death Rate") + scale_fill_manual(values = c("Australia" = "steelblue", "Canada" = "firebrick")) + theme_minimal()
+  
+# The Graph suggests that the death rate was much higher in Canada then Australia across countless provinces. Despite the many similarities of the two countries, this suggests there was a serious difference in the two countries responses to Covid-19. Without other data points to investigate to account for other variables, we can only suggest reasons for the difference. I largely believe that the reason for this difference is geography, and overarching different approach to covid-19. Australia as an Island country, could better ensure its isolation, and prevent other cases from coming into Australia, furthermore it was more able to lockdown cases due to single country wide approach, granted once again via its geographical position. Canada on the other hand shared a large border with the United States, meaning locking down traffic between the them would be much more difficult, and as such pushed away from a country wide response. Because of this provinces were given more autonomy in their response. To ensure there is a difference between the two, lets utilize a model to examine the difference.
+  
+m <- lm(DeathRate ~ Country, data = ac_data)
+summary(m)
+
+# As we can see, the data suggests Canada has higher death rate of the two countries. There are plenty of more variables to investigate, for example the population density of these states, and the types of policy they carried out. Bias impacted what countries I choose to look at, and the reasoning behind my analysis. My more politics orientated backgrounds lends me to focus more on a policy response where possible. 
